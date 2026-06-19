@@ -1,0 +1,22 @@
+#!/bin/bash
+# OpenClaw -> OpenCode 调用包装器
+# OpenClaw 通过 command tool 调用本脚本，本脚本再调用 opencode CLI。
+# 这样可以在不依赖调用方 HOME 的情况下固定 OpenCode 配置文件路径。
+
+set -e
+
+CONFIG_PATH="/data/opencode/.config/opencode/config.json"
+
+if [ ! -f "$CONFIG_PATH" ]; then
+    echo "错误: 未找到 OpenCode 配置文件 $CONFIG_PATH" >&2
+    exit 1
+fi
+
+# 让 opencode 读取固定配置文件
+# opencode 若支持 --config 则优先使用；否则依赖 HOME 指向 /data/openclaw（已在 supervisord 中设置）
+if opencode --help 2>/dev/null | grep -q -- '--config'; then
+    exec opencode --config "$CONFIG_PATH" "$@"
+else
+    export HOME=/data/openclaw
+    exec opencode "$@"
+fi

@@ -1,0 +1,118 @@
+#!/bin/bash
+# langgraph-resume — 恢复暂停的 LangGraph 工作流（Human-in-the-Loop 回路）
+#
+# 用法（命令行）：
+#   langgraph-resume <thread_id> "通过"
+#   langgraph-resume --thread-id <thread_id> --approve --feedback "通过"
+#   langgraph-resume --thread-id <thread_id> --reject --feedback "驳回，请修改 API 接口中的分页参数"
+#
+# 用法（JSON stdin，OpenClaw command tool 调用方式）：
+#   echo '{"thread_id":"xxx","feedback":"通过"}' | langgraph-resume
+#
+# 返回 JSON：{ thread_id, feedback, run_id, status }
+
+set -euo pipefail
+
+LANGGRAPH_PORT="${LANGGRAPH_PORT:-8000}"
+BASE_URL="http://127.0.0.1:${LANGGRAPH_PORT}"
+
+# ── 参数解析 ────────────────────────────────────────────────
+THREAD_ID=""
+FEEDBACK="通过"
+WORKFLOW_ID="auto_programming"
+
+if [[ $# -ge 1 ]]; then
+    if [[ "$1" == "--thread-id" ]]; then
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --thread-id)
+                    THREAD_ID="${2:-}"
+                    shift 2
+                    ;;
+                --approve)
+                    FEEDBACK="通过"
+                    shift
+                    ;;
+                --reject)
+                    FEEDBACK="驳回"
+                    shift
+                    ;;
+                --feedback)
+                    FEEDBACK="${2:-$FEEDBACK}"
+                    shift 2
+                    ;;
+                --workflow)
+                    WORKFLOW_ID="${2:-auto_programming}"
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+    else
+        THREAD_ID="$1"
+        FEEDBACK="${2:-通过}"
+    fi
+else
+    INPUT="$(cat)"
+    THREAD_ID="$(echo "$INPUT" | python3 -c \
+        'import sys,json; print(json.load(sys.stdin).get("thread_id",""))' 2>/dev/null || echo "")"
+    FEEDBACK="$(echo "$INPUT" | python3 -c \
+        'import sys,json; print(json.load(sys.stdin).get("feedback","通过"))' 2>/dev/null || echo "通过")"
+    WORKFLOW_ID="$(echo "$INPUT" | python3 -c \
+        'import sys,json; print(json.load(sys.stdin).get("workflow","auto_programming"))' 2>/dev/null || echo "auto_programming")"
+fi
+
+if [[ -z "$THREAD_ID" ]]; then
+    echo '{"error":"thread_id is required"}' >&2
+    exit 1
+fi
+
+# ── 构建 resume 命令 payload ────────────────────────────────
+RESP=""
+RESUME_ERROR=""
+for RUN_KEY in assistant_id graph_id; do
+    RESUME_PAYLOAD="$(python3 -c "
+import json, sys
+feedback = sys.argv[1]
+run_key = sys.argv[2]
+workflow_id = sys.argv[3]
+payload = {
+    run_key: workflow_id,
+    'assistant_id': workflow_id,
+    'command': {'resume': feedback}
+}
+print(json.dumps(payload))
+" "$FEEDBACK" "$RUN_KEY" "$WORKFLOW_ID")"
+
+    if RESP="$(curl -sf -X POST "${BASE_URL}/threads/${THREAD_ID}/runs" \
+        -H "Content-Type: application/json" \
+        -d "$RESUME_PAYLOAD" 2>&1)"; then
+        RESUME_ERROR=""
+        break
+    fi
+    RESUME_ERROR="$RESP"
+    RESP=""
+done
+
+if [[ -z "$RESP" ]]; then
+    echo "{\"error\":\"failed to resume: ${RESUME_ERROR}\"}" >&2
+    exit 1
+fi
+
+RUN_ID="$(echo "$RESP" | python3 -c \
+    'import sys,json; d=json.load(sys.stdin); print(d.get("run_id", d.get("id","")))' \
+    2>/dev/null || echo "")"
+
+# ── 输出结果 ─────────────────────────────────────────────────
+python3 -c "
+import json
+print(json.dumps({
+    'thread_id': '${THREAD_ID}',
+    'workflow':  '${WORKFLOW_ID}',
+    'feedback':  $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$FEEDBACK"),
+    'run_id':    '${RUN_ID}',
+    'status':    'resumed'
+}, ensure_ascii=False))
+"

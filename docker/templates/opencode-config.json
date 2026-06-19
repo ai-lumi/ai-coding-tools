@@ -1,0 +1,4 @@
+{
+  "$schema": "https://opencode.ai/schema/config.json",
+  "model": "${OPENCODE_PRIMARY_MODEL}"
+}

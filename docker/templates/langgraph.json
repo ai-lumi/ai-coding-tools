@@ -1,0 +1,11 @@
+{
+  "dependencies": ["./src"],
+  "graphs": {
+    "photo_sorter": "./src/photo_sorter.py:graph",
+    "auto_programming": "./src/auto_programming.py:graph"
+  },
+  "env": "/data/.env",
+  "checkpointer": {
+    "path": "./src/checkpointer.py:create_checkpointer"
+  }
+}

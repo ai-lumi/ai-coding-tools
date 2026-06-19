@@ -1,0 +1,97 @@
+{
+  "$schema": "https://openclaw.ai/schema/config.json",
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "${PRIMARY_MODEL}",
+        "fallbacks": []
+      },
+      "workspace": "/data/code"
+    },
+    "list": [
+      {
+        "id": "main",
+        "name": "主助手"
+      },
+      {"id": "pm", "name": "产品经理", "model": {"primary": "${ROLE_PM_MODEL}"}},
+      {"id": "business_analyst", "name": "业务分析师", "model": {"primary": "${ROLE_BUSINESS_ANALYST_MODEL}"}},
+      {"id": "system_architect", "name": "系统架构师", "model": {"primary": "${ROLE_ARCHITECT_MODEL}"}},
+      {"id": "api_designer", "name": "API 设计师", "model": {"primary": "${ROLE_API_DESIGNER_MODEL}"}},
+      {"id": "database_engineer", "name": "数据库工程师", "model": {"primary": "${ROLE_DATABASE_ENGINEER_MODEL}"}},
+      {"id": "tech_lead", "name": "技术负责人", "model": {"primary": "${ROLE_TECH_LEAD_MODEL}"}},
+      {"id": "backend_engineer", "name": "后端工程师", "model": {"primary": "${ROLE_BACKEND_ENGINEER_MODEL}"}},
+      {"id": "frontend_engineer", "name": "前端工程师", "model": {"primary": "${ROLE_FRONTEND_ENGINEER_MODEL}"}},
+      {"id": "devops_engineer", "name": "DevOps 工程师", "model": {"primary": "${ROLE_DEVOPS_ENGINEER_MODEL}"}},
+      {"id": "code_reviewer", "name": "代码评审员", "model": {"primary": "${ROLE_CODE_REVIEWER_MODEL}"}},
+      {"id": "security_engineer", "name": "安全工程师", "model": {"primary": "${ROLE_SECURITY_ENGINEER_MODEL}"}},
+      {"id": "qa_engineer", "name": "测试工程师", "model": {"primary": "${ROLE_QA_ENGINEER_MODEL}"}},
+      {"id": "technical_writer", "name": "技术文档工程师", "model": {"primary": "${ROLE_TECHNICAL_WRITER_MODEL}"}},
+      {"id": "project_manager", "name": "项目经理", "model": {"primary": "${ROLE_PROJECT_MANAGER_MODEL}"}}
+    ]
+  },
+  "models": {
+    "mode": "replace",
+    "providers": {
+      "${PROVIDER_NAME}": {
+        "baseUrl": "${PROVIDER_BASE_URL}",
+        "apiKey": "${API_KEY}",
+        "api": "${PROVIDER_API_TYPE}",
+        "auth": "api-key",
+        "models": [
+          {
+            "id": "${MODEL_ID}",
+            "name": "${MODEL_NAME}",
+            "api": "${PROVIDER_API_TYPE}",
+            "maxTokens": 32768
+          }
+        ]
+      }
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    },
+    "bind": "lan",
+    "port": ${OPENCLAW_GATEWAY_PORT},
+    "http": {
+      "endpoints": {
+        "chatCompletions": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "tools": {
+    "exec": {
+      "ask": "off"
+    }
+  },
+  "skills": {
+    "load": {
+      "extraDirs": ["/data/openclaw/skills"],
+      "watch": true
+    }
+  },
+  ${CHANNELS_BLOCK},
+  "env": {
+    "shellEnv": {
+      "enabled": false
+    },
+    "vars": {
+      "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+      "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
+      "KIMI_API_KEY": "${KIMI_API_KEY}",
+      "MOONSHOT_API_KEY": "${MOONSHOT_API_KEY}",
+      "OPENCODE_ZEN_API_KEY": "${OPENCODE_ZEN_API_KEY}",
+      "PROVIDER_BASE_URL": "${PROVIDER_BASE_URL}",
+      "API_KEY": "${API_KEY}",
+      "MODEL_ID": "${MODEL_ID}",
+      "PRIMARY_MODEL": "${PRIMARY_MODEL}",
+      "OPENCLAW_GATEWAY_TOKEN": "${OPENCLAW_GATEWAY_TOKEN}",
+      "OPENCLAW_GATEWAY_PORT": "${OPENCLAW_GATEWAY_PORT}"
+    }
+  }
+}

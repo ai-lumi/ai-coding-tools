@@ -1,0 +1,9 @@
+# Skills 预装列表
+# 在引导模式中会执行 openclaw skills install 安装这些 Skills
+# 针对多 Agent 编程工具链，默认安装与编码规范、工作流相关的 Skills
+
+spec-driven-development
+test-driven-development
+engineering-workflow
+commit
+mermaid-diagrams

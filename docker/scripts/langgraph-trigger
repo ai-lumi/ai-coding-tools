@@ -1,0 +1,221 @@
+#!/bin/bash
+# langgraph-trigger — 触发 LangGraph auto_programming 工作流
+#
+# 从 OPENCLAW_SESSION_KEY 自动提取 chat_id（飞书群聊），
+# 支持 --project 指定项目子目录。
+#
+# 用法（命令行）：
+#   langgraph-trigger "任务标题" "需求详细描述"
+#   langgraph-trigger --task-title "任务标题" --task-desc "需求详细描述" --project alpha
+#
+# 用法（JSON stdin，OpenClaw command tool 调用方式）：
+#   echo '{"task_title":"...","task_description":"...","project":"alpha"}' | langgraph-trigger
+#
+# 返回 JSON：{ task_id, thread_id, run_id, status }
+
+set -euo pipefail
+
+LANGGRAPH_PORT="${LANGGRAPH_PORT:-8000}"
+BASE_URL="http://127.0.0.1:${LANGGRAPH_PORT}"
+
+# ── 从 OpenClaw 环境变量中提取 chat_id ──────────────────────
+# v2026.6.6+ 的 exec tool 自动注入 OPENCLAW_SESSION_KEY
+# 群聊格式: agent:main:feishu:group:oc_xxx
+# 单聊格式: agent:main:main（不含 chat_id）
+SESSION_KEY="${OPENCLAW_SESSION_KEY:-}"
+CHAT_ID=""
+if echo "$SESSION_KEY" | grep -qE 'feishu:(group|p2p):oc_'; then
+    CHAT_ID=$(echo "$SESSION_KEY" | sed 's/.*:oc_/oc_/')
+fi
+
+# ── 参数解析 ────────────────────────────────────────────────
+TASK_TITLE=""
+TASK_DESC=""
+PROJECT_DIR=""
+WORKFLOW_ID="auto_programming"
+
+if [[ $# -ge 1 ]]; then
+    if [[ "$1" == --* ]]; then
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --task-title)
+                    TASK_TITLE="${2:-}"
+                    shift 2
+                    ;;
+                --task-desc)
+                    TASK_DESC="${2:-}"
+                    shift 2
+                    ;;
+                --project)
+                    PROJECT_DIR="${2:-}"
+                    shift 2
+                    ;;
+                --workflow)
+                    WORKFLOW_ID="${2:-auto_programming}"
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+        TASK_DESC="${TASK_DESC:-$TASK_TITLE}"
+    else
+        TASK_TITLE="$1"
+        TASK_DESC="${2:-$1}"
+    fi
+else
+    INPUT="$(cat)"
+    TASK_TITLE="$(echo "$INPUT" | python3 -c \
+        'import sys,json; d=json.load(sys.stdin); print(d.get("task_title",""))' 2>/dev/null || echo "")"
+    TASK_DESC="$(echo "$INPUT" | python3 -c \
+        'import sys,json; d=json.load(sys.stdin); print(d.get("task_description",""))' 2>/dev/null || echo "")"
+    PROJECT_DIR="$(echo "$INPUT" | python3 -c \
+        'import sys,json; d=json.load(sys.stdin); print(d.get("project",""))' 2>/dev/null || echo "")"
+    WORKFLOW_ID="$(echo "$INPUT" | python3 -c \
+        'import sys,json; d=json.load(sys.stdin); print(d.get("workflow","auto_programming"))' 2>/dev/null || echo "auto_programming")"
+fi
+
+if [[ -z "$TASK_TITLE" ]]; then
+    echo '{"error":"task_title is required"}' >&2
+    exit 1
+fi
+
+# ── 辅助函数 ────────────────────────────────────────────────
+json_str() {
+    python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))' <<< "$1"
+}
+
+# ── 检查 LangGraph 是否就绪 ─────────────────────────────────
+for i in $(seq 1 15); do
+    if curl -sf "${BASE_URL}/info" >/dev/null 2>&1; then
+        break
+    fi
+    if [[ $i -eq 15 ]]; then
+        echo '{"error":"LangGraph server not available"}' >&2
+        exit 1
+    fi
+    sleep 2
+done
+
+# ── 生成任务 ID ─────────────────────────────────────────────
+TASK_ID="task-$(openssl rand -hex 6)"
+CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# ── 创建线程 ─────────────────────────────────────────────────
+THREAD_RESP="$(curl -sf -X POST "${BASE_URL}/threads" \
+    -H "Content-Type: application/json" \
+    -d '{}' 2>&1)" || {
+    echo "{\"error\":\"failed to create thread: ${THREAD_RESP}\"}" >&2
+    exit 1
+}
+
+THREAD_ID="$(echo "$THREAD_RESP" | python3 -c \
+    'import sys,json; d=json.load(sys.stdin); print(d.get("thread_id", d.get("id","")))' 2>/dev/null || echo "")"
+
+if [[ -z "$THREAD_ID" ]]; then
+    echo "{\"error\":\"no thread_id in response\",\"response\":${THREAD_RESP}}" >&2
+    exit 1
+fi
+
+# ── 构建初始状态（TaskState 所有字段必须给值）─────────────────
+TITLE_JSON="$(json_str "$TASK_TITLE")"
+DESC_JSON="$(json_str "$TASK_DESC")"
+PROJECT_JSON="$(json_str "$PROJECT_DIR")"
+CHAT_ID_JSON="$(json_str "$CHAT_ID")"
+
+INITIAL_STATE=$(cat <<JSON
+{
+  "task_id":             "${TASK_ID}",
+  "task_title":          ${TITLE_JSON},
+  "task_description":    ${DESC_JSON},
+  "project_dir":         ${PROJECT_JSON},
+  "chat_id":             ${CHAT_ID_JSON},
+  "created_at":          "${CREATED_AT}",
+  "current_phase":       "初始化",
+  "status":              "pending",
+  "progress":            0.0,
+  "retry_count":         0,
+  "max_retries":         3,
+  "error":               null,
+  "human_review_phase":  null,
+  "human_review_question": null,
+  "human_feedback":      null,
+  "needs_human_review":  false,
+  "requirements":        null,
+  "business_analysis":   null,
+  "architecture_design": null,
+  "api_contracts":       null,
+  "database_design":     null,
+  "devops_plan":         null,
+  "implementation_plan": null,
+  "tech_lead_decisions": null,
+  "backend_result":      null,
+  "frontend_result":     null,
+  "code_changes":        [],
+  "files_modified":      [],
+  "opencode_results":    [],
+  "review_result":       null,
+  "review_comments":     [],
+  "review_approved":     false,
+  "security_result":     null,
+  "security_approved":   false,
+  "api_review_result":   null,
+  "test_plan":           null,
+  "test_results":        [],
+  "test_passed":         false,
+  "validation_result":   null,
+  "documents":           null,
+  "summary":             "",
+  "blockers":            [],
+  "next_actions":        []
+}
+JSON
+)
+
+# ── 启动工作流 run（异步，不等待完成）───────────────────────
+RUN_RESP=""
+RUN_ERROR=""
+for RUN_KEY in assistant_id graph_id; do
+    RUN_PAYLOAD=$(python3 -c "
+import json, sys
+state = json.loads(sys.stdin.read())
+key = sys.argv[1]
+workflow_id = sys.argv[2]
+print(json.dumps({key: workflow_id, 'input': state}))
+" "$RUN_KEY" "$WORKFLOW_ID" <<< "$INITIAL_STATE")
+
+    if RUN_RESP="$(curl -sf -X POST "${BASE_URL}/threads/${THREAD_ID}/runs" \
+        -H "Content-Type: application/json" \
+        -d "$RUN_PAYLOAD" 2>&1)"; then
+        RUN_ERROR=""
+        break
+    fi
+    RUN_ERROR="$RUN_RESP"
+    RUN_RESP=""
+done
+
+if [[ -z "$RUN_RESP" ]]; then
+    echo "{\"error\":\"failed to start run: ${RUN_ERROR}\"}" >&2
+    exit 1
+fi
+
+RUN_ID="$(echo "$RUN_RESP" | python3 -c \
+    'import sys,json; d=json.load(sys.stdin); print(d.get("run_id", d.get("id","")))' \
+    2>/dev/null || echo "")"
+
+# ── 输出结果 ─────────────────────────────────────────────────
+python3 -c "
+import json
+print(json.dumps({
+    'task_id':   '${TASK_ID}',
+    'thread_id': '${THREAD_ID}',
+    'run_id':    '${RUN_ID}',
+    'workflow':  '${WORKFLOW_ID}',
+    'project':   '${PROJECT_DIR}',
+    'chat_id':   '${CHAT_ID}',
+    'status':    'started',
+    'message':   '工作流已启动，可通过 LangGraph Studio 查看进度',
+    'studio_url': 'https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:${LANGGRAPH_PORT}'
+}, ensure_ascii=False))
+"
