@@ -38,16 +38,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Read VERSIONS file
-        id: versions
-        run: |
-          echo "build_args<<EOF" >> $GITHUB_OUTPUT
-          while IFS='=' read -r key value; do
-            [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
-            echo "$key=$value" >> $GITHUB_OUTPUT
-          done < docker/VERSIONS
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v6
@@ -65,6 +55,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: ${{ steps.versions.outputs.build_args }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
