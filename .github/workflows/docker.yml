@@ -41,17 +41,12 @@ jobs:
       - name: Read VERSIONS file
         id: versions
         run: |
+          echo "build_args<<EOF" >> $GITHUB_OUTPUT
           while IFS='=' read -r key value; do
-            # 跳过注释和空行
             [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
-            # 生成逗号分隔的 build-args 字符串
-            if [ -z "$args" ]; then
-              args="$key=$value"
-            else
-              args="$args,$key=$value"
-            fi
+            echo "$key=$value" >> $GITHUB_OUTPUT
           done < docker/VERSIONS
-          echo "build_args=$args" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Docker metadata
         id: meta
