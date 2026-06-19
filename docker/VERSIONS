@@ -1,8 +1,8 @@
 # Component versions for the multi-agent coding toolchain Docker image
 # This is the single source of truth for all pinned dependencies.
 # Update versions here, then rebuild the image.
-OPENCLAW_VERSION=2026.6.6
-OPENCODE_VERSION=1.17.7
-FEISHU_PLUGIN_VERSION=2026.6.6
+OPENCLAW_VERSION=2026.6.8
+OPENCODE_VERSION=1.17.8
+FEISHU_PLUGIN_VERSION=2026.6.8
 LANGGRAPH_CLI_VERSION=0.4.29
 LANGGRAPH_CHECKPOINT_SQLITE_VERSION=3.1.0

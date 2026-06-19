@@ -8,9 +8,9 @@ LABEL description="Multi-Agent Coding Toolchain (OpenClaw + OpenCode + LangGraph
 # 通过 Docker ARG 注入，确保构建可复现。
 # 构建时可覆盖：docker build --build-arg OPENCLAW_VERSION=x.y.z
 # ============================================================
-ARG OPENCLAW_VERSION=2026.6.6
-ARG OPENCODE_VERSION=1.17.7
-ARG FEISHU_PLUGIN_VERSION=2026.6.6
+ARG OPENCLAW_VERSION=2026.6.8
+ARG OPENCODE_VERSION=1.17.8
+ARG FEISHU_PLUGIN_VERSION=2026.6.8
 
 # 避免交互式提示
 ENV DEBIAN_FRONTEND=noninteractive
@@ -48,7 +48,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 锁定版本安装 OpenClaw 与 OpenCode，保证构建可复现
-RUN npm install -g openclaw@${OPENCLAW_VERSION} opencode-ai@${OPENCODE_VERSION}
+# 分开安装避免依赖解析冲突，同时便于定位哪个包安装失败
+RUN npm install -g openclaw@${OPENCLAW_VERSION}
+RUN npm install -g opencode-ai@${OPENCODE_VERSION}
 
 # 预安装飞书渠道插件（npm 侧），将包下载到全局 npm cache 中，
 # 运行时 entrypoint 执行 openclaw plugins install 时会直接命中缓存，无需联网
