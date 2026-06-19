@@ -11,6 +11,7 @@ LABEL description="Multi-Agent Coding Toolchain (OpenClaw + OpenCode + LangGraph
 ARG OPENCLAW_VERSION=2026.6.8
 ARG OPENCODE_VERSION=1.17.8
 ARG FEISHU_PLUGIN_VERSION=2026.6.8
+ARG USE_MIRRORS=false
 
 # 避免交互式提示
 ENV DEBIAN_FRONTEND=noninteractive
@@ -25,13 +26,13 @@ ENV LC_ALL=C.UTF-8
 # 将构建 ARG 持久化为运行时可访问的环境变量（entrypoint 需要读取）
 ENV FEISHU_PLUGIN_VERSION=${FEISHU_PLUGIN_VERSION}
 
-# 更换为阿里云 Debian 源，加速国内构建
-# Debian 12 使用 .sources 格式，位于 /etc/apt/sources.list.d/debian.sources
-# 使用 HTTP 而非 HTTPS，避免 slim 镜像缺少 ca-certificates 导致证书验证失败
-RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources && \
-    sed -i 's|Components: main|Components: main contrib non-free non-free-firmware|g' /etc/apt/sources.list.d/debian.sources
-
 # 安装系统依赖（含时区数据和 locales）
+# Debian 12 的 .sources 格式默认不包含 contrib/non-free，需要显式添加
+# USE_MIRRORS=true 时替换为阿里云镜像（国内构建加速）
+RUN if [ "$USE_MIRRORS" = "true" ]; then \
+      sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources; \
+    fi && \
+    sed -i 's|Components: main|Components: main contrib non-free non-free-firmware|g' /etc/apt/sources.list.d/debian.sources
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-venv \
@@ -62,13 +63,20 @@ RUN mkdir -p /opt/feishu-plugin && \
     rm -rf /opt/feishu-plugin
 
 # 预创建 LangGraph Python 虚拟环境并安装依赖，避免每次容器启动都重新下载
-# 使用清华大学 PyPI 镜像加速国内构建；venv 放在 /opt 下，避免被 /data/langgraph 挂载覆盖
+# venv 放在 /opt 下，避免被 /data/langgraph 挂载覆盖
+# USE_MIRRORS=true 时使用清华大学 PyPI 镜像（国内构建加速）
 COPY templates/langgraph-src/requirements.txt /tmp/requirements.txt
 RUN mkdir -p /opt/langgraph && \
     python3 -m venv /opt/langgraph/.venv && \
-    /opt/langgraph/.venv/bin/pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r /tmp/requirements.txt && \
+    PIP_MIRROR=""; \
+    if [ "$USE_MIRRORS" = "true" ]; then \
+      PIP_MIRROR="-i https://pypi.tuna.tsinghua.edu.cn/simple"; \
+    fi; \
+    /opt/langgraph/.venv/bin/pip install --no-cache-dir $PIP_MIRROR -r /tmp/requirements.txt && \
     rm -f /tmp/requirements.txt && \
-    /opt/langgraph/.venv/bin/pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+    if [ "$USE_MIRRORS" = "true" ]; then \
+      /opt/langgraph/.venv/bin/pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; \
+    fi
 
 # 创建 /data 目录结构
 RUN mkdir -p /data/openclaw/.openclaw \

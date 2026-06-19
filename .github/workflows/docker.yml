@@ -47,6 +47,14 @@ jobs:
             type=raw,value=${{ github.event.inputs.tag || 'latest' }}
             type=sha,prefix=,format=short
 
+      - name: Read VERSIONS file
+        id: versions
+        run: |
+          . docker/VERSIONS
+          echo "openclaw=$OPENCLAW_VERSION" >> $GITHUB_OUTPUT
+          echo "opencode=$OPENCODE_VERSION" >> $GITHUB_OUTPUT
+          echo "feishu=$FEISHU_PLUGIN_VERSION" >> $GITHUB_OUTPUT
+
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
@@ -55,5 +63,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            OPENCLAW_VERSION=${{ steps.versions.outputs.openclaw }}
+            OPENCODE_VERSION=${{ steps.versions.outputs.opencode }}
+            FEISHU_PLUGIN_VERSION=${{ steps.versions.outputs.feishu }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
