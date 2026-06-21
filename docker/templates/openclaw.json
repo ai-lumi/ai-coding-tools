@@ -54,7 +54,7 @@
       "mode": "token",
       "token": "${OPENCLAW_GATEWAY_TOKEN}"
     },
-    "bind": "0.0.0.0",
+    "bind": "${OPENCLAW_GATEWAY_BIND}",
     "port": ${OPENCLAW_GATEWAY_PORT},
     "http": {
       "endpoints": {
