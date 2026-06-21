@@ -49,12 +49,12 @@
     }
   },
   "gateway": {
-    "mode": "local",
+    "mode": "remote",
     "auth": {
       "mode": "token",
       "token": "${OPENCLAW_GATEWAY_TOKEN}"
     },
-    "bind": "lan",
+    "bind": "0.0.0.0",
     "port": ${OPENCLAW_GATEWAY_PORT},
     "http": {
       "endpoints": {
