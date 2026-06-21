@@ -50,6 +50,9 @@
   },
   "gateway": {
     "mode": "remote",
+    "remote": {
+      "url": "http://127.0.0.1:${OPENCLAW_GATEWAY_PORT}"
+    },
     "auth": {
       "mode": "token",
       "token": "${OPENCLAW_GATEWAY_TOKEN}"
