@@ -59,6 +59,9 @@
     },
     "bind": "${OPENCLAW_GATEWAY_BIND}",
     "port": ${OPENCLAW_GATEWAY_PORT},
+    "controlUi": {
+      "dangerouslyDisableDeviceAuth": true
+    },
     "http": {
       "endpoints": {
         "chatCompletions": {
