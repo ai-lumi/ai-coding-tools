@@ -9,6 +9,7 @@ services:
       # 启动模式: interactive（首次交互引导） / auto（读取 .env 自动初始化） / skip / reset
       - INIT_MODE=${INIT_MODE:-auto}
       - OPENCLAW_GATEWAY_PORT=${OPENCLAW_GATEWAY_PORT:-18789}
+      - OPENCLAW_GATEWAY_BIND=lan
       - LANGGRAPH_PORT=${LANGGRAPH_PORT:-8000}
       - OPENCODE_PORT=${OPENCODE_PORT:-4096}
       - OPENCODE_HOSTNAME=0.0.0.0
