@@ -31,6 +31,7 @@
   },
   "models": {
     "mode": "replace",
+    "skipPricing": true,
     "providers": {
       "${PROVIDER_NAME}": {
         "baseUrl": "${PROVIDER_BASE_URL}",
@@ -74,6 +75,9 @@
     "exec": {
       "ask": "off"
     }
+  },
+  "plugins": {
+    "allow": ["@openclaw/feishu"]
   },
   "skills": {
     "load": {
