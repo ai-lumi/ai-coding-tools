@@ -31,7 +31,9 @@
   },
   "models": {
     "mode": "replace",
-    "skipPricing": true,
+    "pricing": {
+      "enabled": false
+    },
     "providers": {
       "${PROVIDER_NAME}": {
         "baseUrl": "${PROVIDER_BASE_URL}",
