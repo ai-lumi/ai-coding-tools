@@ -44,6 +44,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     openssl \
     tzdata \
+    procps \
+    net-tools \
+    iproute2 \
+    dnsutils \
+    netcat-openbsd \
+    lsof \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
