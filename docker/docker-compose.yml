@@ -95,6 +95,9 @@ services:
       - "${LANGGRAPH_BIND:-127.0.0.1}:${LANGGRAPH_PORT:-8000}:${LANGGRAPH_PORT:-8000}"
       # OpenCode：容器内默认监听 127.0.0.1，端口映射安全；NAS 设 OPENCODE_HOSTNAME=0.0.0.0 开启外部访问
       - "${OPENCODE_PORT:-4096}:${OPENCODE_PORT:-4096}"
+    dns:
+      - 223.5.5.5
+      - 8.8.8.8
     mem_limit: 6g
     healthcheck:
       test:
