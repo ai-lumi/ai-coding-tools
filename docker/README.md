@@ -111,18 +111,18 @@ docker compose up -d
 
 ## 卷映射说明
 
-`docker-compose.yml` 将主机目录挂载到容器 `/data` 下各子目录。建议将实际开发项目挂载到 `CODE_DIR`。
+`docker-compose.yml` 将主机目录挂载到容器 `/data` 下各子目录。卷映射根路径通过 `DATA_DIR` 控制（默认 `./data`），NAS 用户设为绝对路径即可。建议将实际开发项目挂载到 `CODE_DIR`。
 
 | 主机路径 | 容器路径 | 用途 |
 |---|---|---|
-| `./data/openclaw` | `/data/openclaw` | OpenClaw 运行时配置（`openclaw.json`）、会话、Skills |
-| `./data/opencode` | `/data/opencode` | OpenCode 配置（`.config/opencode/config.json`） |
-| `./data/langgraph` | `/data/langgraph` | LangGraph 工作流源码与 `langgraph.json` 配置 |
-| `./data/memory` | `/data/memory` | 三层记忆文件（全局 MEMORY.md / 会话 / 任务）+ 每日笔记 |
-| `./data/logs` | `/data/logs` | supervisord / openclaw / opencode / langgraph 日志 |
-| `${PHOTOS_DIR:-./data/photos}` | `/data/photos` | 照片/多媒体数据（照片分拣工作流使用） |
-| `${CODE_DIR:-./data/code}` | `/data/code` | **代码仓库工作目录**（Agent 在此执行代码修改） |
-| `${KNOWLEDGE_DIR:-./data/knowledge}` | `/data/knowledge` | 知识库文档 |
+| `${DATA_DIR:-./data}/openclaw` | `/data/openclaw` | OpenClaw 运行时配置（`openclaw.json`）、会话、Skills |
+| `${DATA_DIR:-./data}/opencode` | `/data/opencode` | OpenCode 配置（`.config/opencode/config.json`） |
+| `${DATA_DIR:-./data}/langgraph` | `/data/langgraph` | LangGraph 工作流源码与 `langgraph.json` 配置 |
+| `${DATA_DIR:-./data}/memory` | `/data/memory` | 三层记忆文件（全局 MEMORY.md / 会话 / 任务）+ 每日笔记 |
+| `${DATA_DIR:-./data}/logs` | `/data/logs` | supervisord / openclaw / opencode / langgraph 日志 |
+| `${PHOTOS_DIR:-${DATA_DIR:-./data}/photos}` | `/data/photos` | 照片/多媒体数据（照片分拣工作流使用） |
+| `${CODE_DIR:-${DATA_DIR:-./data}/code}` | `/data/code` | **代码仓库工作目录**（Agent 在此执行代码修改） |
+| `${KNOWLEDGE_DIR:-${DATA_DIR:-./data}/knowledge}` | `/data/knowledge` | 知识库文档 |
 
 ### 关键文件说明
 
@@ -286,7 +286,9 @@ graph TD
 ### 可选
 
 | 变量 | 默认值 | 说明 |
-|---|---|---|
+|---|---|---|---|
+| `DATA_DIR` | `./data` | 卷映射根路径（NAS 设为绝对路径如 `/share/Container/ai-workspace/data`） |
+| `LANGGRAPH_BIND` | `127.0.0.1` | LangGraph 端口绑定地址（NAS 设为空以全接口开放） |
 | `OPENCLAW_GATEWAY_PORT` | 18789 | Gateway 端口 |
 | `OPENCLAW_GATEWAY_TOKEN` | 自动生成 | Gateway 认证 Token（32 位 hex） |
 | `LANGGRAPH_PORT` | 8000 | LangGraph Server 端口 |

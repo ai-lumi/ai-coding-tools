@@ -97,6 +97,89 @@ load_auto_config() {
     MOONSHOT_API_KEY="${MOONSHOT_API_KEY:-${API_KEY}}"
     DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-${API_KEY}}"
     OPENCODE_ZEN_API_KEY="${OPENCODE_ZEN_API_KEY:-${API_KEY}}"
+
+    # ============================================================
+    # Fallback 提供商（可选）
+    # ============================================================
+    # 当 FALLBACK_PROVIDER_NAME 设置时，OpenClaw 会在主模型认证/额度失败后自动切换。
+    if [ -n "${FALLBACK_PROVIDER_NAME:-}" ]; then
+        # 内置 provider 不需要 FALLBACK_BASE_URL
+        if [ "$FALLBACK_PROVIDER_NAME" != "opencode" ] && [ "$FALLBACK_PROVIDER_NAME" != "kimi" ]; then
+            if [ -z "${FALLBACK_BASE_URL:-}" ]; then
+                error "FALLBACK_PROVIDER_NAME=$FALLBACK_PROVIDER_NAME 需要设置 FALLBACK_BASE_URL"
+                exit 1
+            fi
+        fi
+
+        # 自动推断 fallback 的 BASE_URL 和 API_TYPE
+        case "$FALLBACK_PROVIDER_NAME" in
+            opencode)
+                FALLBACK_BASE_URL="${FALLBACK_BASE_URL:-https://api.opencode.ai/v1}"
+                FALLBACK_API_TYPE="${FALLBACK_API_TYPE:-openai-completions}"
+                FALLBACK_MODEL_ID="${FALLBACK_MODEL_ID:-gpt-5.1-codex}"
+                ;;
+            kimi)
+                FALLBACK_BASE_URL="${FALLBACK_BASE_URL:-https://api.kimi.com/coding/v1}"
+                FALLBACK_API_TYPE="${FALLBACK_API_TYPE:-anthropic-messages}"
+                FALLBACK_MODEL_ID="${FALLBACK_MODEL_ID:-kimi-for-coding}"
+                ;;
+            deepseek)
+                FALLBACK_BASE_URL="${FALLBACK_BASE_URL:-https://api.deepseek.com/v1}"
+                FALLBACK_API_TYPE="${FALLBACK_API_TYPE:-openai-completions}"
+                ;;
+            openai)
+                FALLBACK_BASE_URL="${FALLBACK_BASE_URL:-https://api.openai.com/v1}"
+                FALLBACK_API_TYPE="${FALLBACK_API_TYPE:-openai-responses}"
+                ;;
+            anthropic)
+                FALLBACK_BASE_URL="${FALLBACK_BASE_URL:-https://api.anthropic.com}"
+                FALLBACK_API_TYPE="${FALLBACK_API_TYPE:-anthropic-messages}"
+                ;;
+        esac
+        FALLBACK_BASE_URL="${FALLBACK_BASE_URL:-}"
+        FALLBACK_API_TYPE="${FALLBACK_API_TYPE:-openai-completions}"
+        FALLBACK_MODEL_ID="${FALLBACK_MODEL_ID:-}"
+        FALLBACK_MODEL_NAME="${FALLBACK_MODEL_NAME:-$FALLBACK_MODEL_ID}"
+
+        # Fallback API Key：优先用 FALLBACK_API_KEY，否则用 provider 专用变量
+        if [ -z "${FALLBACK_API_KEY:-}" ]; then
+            fallback_key_var="${FALLBACK_PROVIDER_NAME^^}_API_KEY"
+            FALLBACK_API_KEY="${!fallback_key_var:-}"
+        fi
+        if [ -z "$FALLBACK_API_KEY" ]; then
+            error "Fallback 提供商 $FALLBACK_PROVIDER_NAME 需要设置 FALLBACK_API_KEY 或 ${FALLBACK_PROVIDER_NAME^^}_API_KEY"
+            exit 1
+        fi
+
+        FALLBACK_MODEL="${FALLBACK_MODEL:-$FALLBACK_PROVIDER_NAME/$FALLBACK_MODEL_ID}"
+
+        # 构建 fallback provider JSON 块（插入到 openclaw.json providers 中）
+        # 单行格式，兼容 BSD/GNU sed
+        FALLBACK_PROVIDER_BLOCK=",\"${FALLBACK_PROVIDER_NAME}\":{\"baseUrl\":\"${FALLBACK_BASE_URL}\",\"apiKey\":\"${FALLBACK_API_KEY}\",\"api\":\"${FALLBACK_API_TYPE}\",\"auth\":\"api-key\",\"models\":[{\"id\":\"${FALLBACK_MODEL_ID}\",\"name\":\"${FALLBACK_MODEL_NAME}\",\"api\":\"${FALLBACK_API_TYPE}\",\"maxTokens\":32768}]}"
+        FALLBACKS_LIST="[\"${FALLBACK_MODEL}\"]"
+
+        info "Fallback 提供商已配置: $FALLBACK_MODEL"
+    else
+        FALLBACK_PROVIDER_BLOCK=""
+        FALLBACKS_LIST="[]"
+        FALLBACK_PROVIDER_NAME=""
+        FALLBACK_BASE_URL=""
+        FALLBACK_API_KEY=""
+        FALLBACK_API_TYPE=""
+        FALLBACK_MODEL_ID=""
+        FALLBACK_MODEL_NAME=""
+        FALLBACK_MODEL=""
+    fi
+
+    # MODEL_TIERS：含 fallback 时追加到层级列表
+    if [ -n "${FALLBACK_MODEL:-}" ]; then
+        MODEL_TIERS="${MODEL_TIERS:-$OPENCODE_PRIMARY_MODEL,$FALLBACK_MODEL}"
+        MODEL_TIER_NAMES="${MODEL_TIER_NAMES:-$MODEL_NAME,$FALLBACK_MODEL_NAME}"
+    else
+        MODEL_TIERS="${MODEL_TIERS:-$OPENCODE_PRIMARY_MODEL}"
+        MODEL_TIER_NAMES="${MODEL_TIER_NAMES:-$MODEL_NAME}"
+    fi
+
     FEISHU_NOTIFY_WEBHOOK="${FEISHU_NOTIFY_WEBHOOK:-}"
     FEISHU_NOTIFY_SECRET="${FEISHU_NOTIFY_SECRET:-}"
     TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
@@ -115,10 +198,6 @@ load_auto_config() {
             OPENCODE_PRIMARY_MODEL="${OPENCODE_PRIMARY_MODEL:-$PRIMARY_MODEL}"
             ;;
     esac
-
-    # 模型层级（额度耗尽时切换用）
-    MODEL_TIERS="${MODEL_TIERS:-$OPENCODE_PRIMARY_MODEL}"
-    MODEL_TIER_NAMES="${MODEL_TIER_NAMES:-$MODEL_NAME}"
 
     # 各角色默认使用主模型，可通过 ROLE_*_MODEL 环境变量单独覆盖
     ROLE_PM_MODEL="${ROLE_PM_MODEL:-$PRIMARY_MODEL}"
@@ -384,6 +463,15 @@ step_generate_configs() {
         -e "s|\${ANTHROPIC_API_KEY}|${ANTHROPIC_API_KEY:-}|g" \
         -e "s|\${KIMI_API_KEY}|${KIMI_API_KEY:-}|g" \
         -e "s|\${MOONSHOT_API_KEY}|${MOONSHOT_API_KEY:-}|g" \
+        -e "s|\${FALLBACK_PROVIDER_BLOCK}|${FALLBACK_PROVIDER_BLOCK}|g" \
+        -e "s|\${FALLBACKS_LIST}|${FALLBACKS_LIST}|g" \
+        -e "s|\${FALLBACK_PROVIDER_NAME}|${FALLBACK_PROVIDER_NAME:-}|g" \
+        -e "s|\${FALLBACK_BASE_URL}|${FALLBACK_BASE_URL:-}|g" \
+        -e "s|\${FALLBACK_API_KEY}|${FALLBACK_API_KEY:-}|g" \
+        -e "s|\${FALLBACK_API_TYPE}|${FALLBACK_API_TYPE:-}|g" \
+        -e "s|\${FALLBACK_MODEL_ID}|${FALLBACK_MODEL_ID:-}|g" \
+        -e "s|\${FALLBACK_MODEL_NAME}|${FALLBACK_MODEL_NAME:-}|g" \
+        -e "s|\${FALLBACK_MODEL}|${FALLBACK_MODEL:-}|g" \
         -e "s|\${ROLE_PM_MODEL}|${ROLE_PM_MODEL:-$PRIMARY_MODEL}|g" \
         -e "s|\${ROLE_BUSINESS_ANALYST_MODEL}|${ROLE_BUSINESS_ANALYST_MODEL:-$PRIMARY_MODEL}|g" \
         -e "s|\${ROLE_ARCHITECT_MODEL}|${ROLE_ARCHITECT_MODEL:-$PRIMARY_MODEL}|g" \

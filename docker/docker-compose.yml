@@ -9,8 +9,10 @@ services:
       # 启动模式: interactive（首次交互引导） / auto（读取 .env 自动初始化） / skip / reset
       - INIT_MODE=${INIT_MODE:-auto}
       - OPENCLAW_GATEWAY_PORT=${OPENCLAW_GATEWAY_PORT:-18789}
+      - OPENCLAW_GATEWAY_BIND=${OPENCLAW_GATEWAY_BIND:-}
       - LANGGRAPH_PORT=${LANGGRAPH_PORT:-8000}
       - OPENCODE_PORT=${OPENCODE_PORT:-4096}
+      - OPENCODE_HOSTNAME=${OPENCODE_HOSTNAME:-}
       - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD:-}
       - OPENCODE_SKIP_PERMISSIONS=${OPENCODE_SKIP_PERMISSIONS:-true}
       - LANGGRAPH_PERSISTENCE=${LANGGRAPH_PERSISTENCE:-true}
@@ -57,6 +59,14 @@ services:
       - MODEL_TIERS=${MODEL_TIERS:-}
       - MODEL_TIER_NAMES=${MODEL_TIER_NAMES:-}
       - MODEL_STATE_FILE=${MODEL_STATE_FILE:-/data/langgraph/model_state.json}
+      # Fallback 提供商（可选）
+      - FALLBACK_PROVIDER_NAME=${FALLBACK_PROVIDER_NAME:-}
+      - FALLBACK_BASE_URL=${FALLBACK_BASE_URL:-}
+      - FALLBACK_API_KEY=${FALLBACK_API_KEY:-}
+      - FALLBACK_API_TYPE=${FALLBACK_API_TYPE:-}
+      - FALLBACK_MODEL_ID=${FALLBACK_MODEL_ID:-}
+      - FALLBACK_MODEL_NAME=${FALLBACK_MODEL_NAME:-}
+      - FALLBACK_MODEL=${FALLBACK_MODEL:-}
       # 可选：OpenClaw Gateway Token（留空则自动生成）
       - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN:-}
       # 可选：消息渠道
@@ -68,23 +78,23 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
     volumes:
-      # 工具链工作目录（持久化配置和状态）
-      - ./data/openclaw:/data/openclaw
-      - ./data/opencode:/data/opencode
-      - ./data/langgraph:/data/langgraph
-      # 统一记忆目录（全局/会话/任务记忆持久化）
-      - ./data/memory:/data/memory
-      # 日志目录（持久化到本地硬盘）
-      - ./data/logs:/data/logs
+      # 工具链工作目录（通过 DATA_DIR 统一控制，NAS 可设为绝对路径）
+      - ${DATA_DIR:-./data}/openclaw:/data/openclaw
+      - ${DATA_DIR:-./data}/opencode:/data/opencode
+      - ${DATA_DIR:-./data}/langgraph:/data/langgraph
+      - ${DATA_DIR:-./data}/memory:/data/memory
+      - ${DATA_DIR:-./data}/logs:/data/logs
       # 业务数据目录（按需挂载）
-      - ${PHOTOS_DIR:-./data/photos}:/data/photos:rw
-      - ${CODE_DIR:-./data/code}:/data/code:rw
-      - ${KNOWLEDGE_DIR:-./data/knowledge}:/data/knowledge:rw
+      - ${PHOTOS_DIR:-${DATA_DIR:-./data}/photos}:/data/photos:rw
+      - ${CODE_DIR:-${DATA_DIR:-./data}/code}:/data/code:rw
+      - ${KNOWLEDGE_DIR:-${DATA_DIR:-./data}/knowledge}:/data/knowledge:rw
     ports:
       # OpenClaw Gateway 需要接收外部渠道 webhook，绑定所有接口
       - "${OPENCLAW_GATEWAY_PORT:-18789}:${OPENCLAW_GATEWAY_PORT:-18789}"
-      # LangGraph Studio / API 仅本地使用，显式绑定 127.0.0.1
-      - "127.0.0.1:${LANGGRAPH_PORT:-8000}:${LANGGRAPH_PORT:-8000}"
+      # LangGraph：默认仅本地，NAS 可设 LANGGRAPH_BIND= 改为全接口
+      - "${LANGGRAPH_BIND:-127.0.0.1}:${LANGGRAPH_PORT:-8000}:${LANGGRAPH_PORT:-8000}"
+      # OpenCode：容器内默认监听 127.0.0.1，端口映射安全；NAS 设 OPENCODE_HOSTNAME=0.0.0.0 开启外部访问
+      - "${OPENCODE_PORT:-4096}:${OPENCODE_PORT:-4096}"
     mem_limit: 6g
     healthcheck:
       test:

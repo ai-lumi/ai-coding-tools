@@ -4,7 +4,7 @@
     "defaults": {
       "model": {
         "primary": "${PRIMARY_MODEL}",
-        "fallbacks": []
+        "fallbacks": ${FALLBACKS_LIST}
       },
       "workspace": "/data/code"
     },
@@ -45,7 +45,7 @@
             "maxTokens": 32768
           }
         ]
-      }
+      }${FALLBACK_PROVIDER_BLOCK}
     }
   },
   "gateway": {
@@ -97,7 +97,14 @@
       "MODEL_ID": "${MODEL_ID}",
       "PRIMARY_MODEL": "${PRIMARY_MODEL}",
       "OPENCLAW_GATEWAY_TOKEN": "${OPENCLAW_GATEWAY_TOKEN}",
-      "OPENCLAW_GATEWAY_PORT": "${OPENCLAW_GATEWAY_PORT}"
+      "OPENCLAW_GATEWAY_PORT": "${OPENCLAW_GATEWAY_PORT}",
+      "FALLBACK_PROVIDER_NAME": "${FALLBACK_PROVIDER_NAME}",
+      "FALLBACK_BASE_URL": "${FALLBACK_BASE_URL}",
+      "FALLBACK_API_KEY": "${FALLBACK_API_KEY}",
+      "FALLBACK_API_TYPE": "${FALLBACK_API_TYPE}",
+      "FALLBACK_MODEL_ID": "${FALLBACK_MODEL_ID}",
+      "FALLBACK_MODEL_NAME": "${FALLBACK_MODEL_NAME}",
+      "FALLBACK_MODEL": "${FALLBACK_MODEL}"
     }
   }
 }
